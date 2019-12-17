@@ -10,6 +10,7 @@ from threading import Thread
 from lib.CommonConstants import BUFFER_SIZE
 from lib import PacketProcessor
 from lib.ForumClasses import DataContainer, Client
+from pandas import DataFrame
 
 # ------------------------------ COLORS -----------------------------------
 COLOR_DATE = colorama.Fore.YELLOW
@@ -25,6 +26,9 @@ COLOR_INDEX = colorama.Fore.WHITE
 # ---------------------------- CMD -----------------------------------
 HELP_SERVER = "%s------------ AVAILABLE SERVER COMMANDS ----------\n" \
               "%s" \
+              "get_products\n" \
+              "get_clients\n" \
+              "help\n" \
               "exit\n" \
               "%s-------------------------------------------------\n%s" % (
                   COLOR_DIV_LINES, COLOR_COMMAND, COLOR_DIV_LINES, colorama.Fore.RESET)
@@ -39,10 +43,46 @@ def cmd_processing(dc: DataContainer):
     while True:
         command = re.sub(" +", " ", input())
         command_splited = command.split()
-        if command == "exit":
+        if command.lower() == "exit":
             exit_server(dc)
+        elif command.lower() == "get_products":
+            print(DataFrame(get_products(dc)))
+        elif command.lower() == "get_clients":
+            print(DataFrame(get_clients(dc)))
+        elif command.lower() == "help":
+            print(HELP_SERVER)
         else:
             print("Undefined command = %s. Use help for information" % command)
+
+
+def get_products(dc: DataContainer):
+    ids = []
+    names = []
+    prices = []
+    counts = []
+    owner_names = []
+
+    for id, product in enumerate(dc.product_list):
+        ids.append(id)
+        names.append(product.name)
+        prices.append(product.price)
+        counts.append(product.count)
+        owner_names.append(product.owner.name)
+
+    return {"ids": ids, "names": names, "prices": prices, "counts": counts, "owner_names": owner_names}
+
+
+def get_clients(dc: DataContainer):
+    ids = []
+    names = []
+    accounts = []
+
+    for id, client in enumerate(dc.client_list):
+        ids.append(id)
+        names.append(client.name)
+        accounts.append(client.bank_account)
+
+    return {"ids": ids, "names": names, "bank_account": accounts}
 
 
 def client_registration(dc, client):
@@ -51,7 +91,6 @@ def client_registration(dc, client):
         client.name = data["data"]["name"]
         client.is_connected = True
         print("New client = %s(%d) accepted" % (client.name, client.conn.fileno()))
-
 
     else:
         print("opcode = %d (%d awaiting)" % (opcode, PacketProcessor.OP_REGISTRATION))
@@ -104,7 +143,7 @@ def main():
     dc = DataContainer()
     dc.mock_data()
     # ---------------- parsing arguments --------------------------
-    parser = argparse.ArgumentParser(description="Client for SimpleForum")
+    parser = argparse.ArgumentParser(description="Client for EShop")
 
     parser.add_argument("-i", "--ip", type=str, action='store',
                         help="direcotry with data")
@@ -120,7 +159,7 @@ def main():
     if TCP_IP is None:
         raise Exception("-i ip of server was't passed")
     if TCP_PORT is None:
-        raise Exception("-p port was't passed ")
+        raise Exception("-p port was't passed")
 
     # ---------------- configuration --------------------------
     s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
