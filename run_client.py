@@ -112,11 +112,11 @@ def read_loop(s, connected):
         opcode, data = PacketProcessor.parse_packet(s.recv(BUFFER_SIZE))
 
         if opcode == PacketProcessor.OP_SERVER_MSG:
-            # TODO
+            server_msg_print(text=data["data"]["text"], date=data["data"]["date"])
             debug_print("OP_SERVER_MSG isn't processed")
 
         elif opcode == PacketProcessor.OP_ANSW_PRODCUTS:
-            # TODO
+            print_products(data_dict=data["data"])
             debug_print("OP_ANSW_PRODCUTS isn't processed")
 
         elif opcode == PacketProcessor.OP_DISC:
