@@ -131,6 +131,20 @@ def read_loop(s, connected):
     os._exit(0)
 
 
+def registration(s):
+    while True:
+        name = input("Print your name: ")
+        send_packet = PacketProcessor.get_registration_packet(name=name)
+        s.send(send_packet)
+
+        opcode, data = PacketProcessor.parse_packet(s.recv(BUFFER_SIZE))
+
+        if opcode == PacketProcessor.OP_REGISTRATION:
+            pass
+        elif opcode == PacketProcessor.OP_SERVER_MSG:
+            server_msg_print(date=data["data"]["date"], text=data["data"]["text"])
+
+
 # ----------------------------------------------------------------
 def main():
     # ---------------- parsing arguments --------------------------
@@ -156,10 +170,7 @@ def main():
     s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     s.connect((TCP_IP, TCP_PORT))
 
-    # Authorization
-    name = input("Print your name: ")
-    send_packet = PacketProcessor.get_registration_packet(name=name)
-    s.send(send_packet)
+    registration(s)
 
     help_print()
 
