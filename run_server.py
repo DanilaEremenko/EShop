@@ -37,9 +37,9 @@ HELP_SERVER = "%s------------ AVAILABLE SERVER COMMANDS ----------\n" \
 def debug_print(text):
     print("%sDEBUG:%s%s" % (colorama.Fore.RED, text, colorama.Fore.RESET))
 
+
 def verbose_print(text):
     print("%sVERBOSE:%s%s" % (colorama.Fore.GREEN, text, colorama.Fore.RESET))
-
 
 
 # ---------------------------------- CMD INPUT  ----------------------------------------------
@@ -130,20 +130,23 @@ def client_processing(client: Client, dc: DataContainer):
             dc.mutex.acquire()
             count = data["data"]["count"]
             new_product = Product(name=data["data"]["name"], price=data["data"]["price"], count=count,
-                                  owner=client.name)
+                                  owner=client)
             dc.add_product(client, new_product)
             dc.mutex.release()
             verbose_print("Product %s added" % data["data"]["name"])
             send_packet = PacketProcessor.get_server_msg_packet("Your product added", "now")
         elif opcode == PacketProcessor.OP_BUY_PRODUCT:
-            client.bank_account -= dc.product_list[data["data"]["id"]].price * data["data"]["count"]
-            debug_print("OP_BUY_PRODUCT isn't processed")
+            ans = dc.buy_product(client, data["data"]["id"], data["data"]["count"])
+            verbose_print(ans)
+            send_packet = PacketProcessor.get_server_msg_packet(
+                "%s.Your bank account = %d" % (ans, client.bank_account), "now")
         elif opcode == PacketProcessor.OP_REQ_PRODUCTS:
-            # TODO
+            send_packet = PacketProcessor.get_answ_prodcuts_packet(dc)
             debug_print("OP_REQ_PRODUCTS isn't processed")
         elif opcode == PacketProcessor.OP_FILL_UP_BA:
-            # TODO
-            debug_print("OP_FILL_UP_BA isn't processed")
+            verbose_print("%s bank account = %d + %d" % (client.name, client.bank_account, data["data"]["money"]))
+            client.bank_account += data["data"]["money"]
+            send_packet = PacketProcessor.get_server_msg_packet("Your bank account = %d" % client.bank_account, "now")
         elif opcode == PacketProcessor.OP_DISC:
             dc.remove_client(reason="DISCONNECTION OPCODE == %d" % opcode, client=client)
             debug_print("OP_DISC isn't processed")

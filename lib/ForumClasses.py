@@ -27,7 +27,7 @@ class Client():
         self.thread = thread
         self.current_topic = None
         self.bank_account = bank_account
-        self.products = []
+        # self.products = []
 
     def __eq__(self, other):
         return self.name == other.name
@@ -55,11 +55,22 @@ class DataContainer():
         return True
 
     def add_product(self, client, product):
+        # self._add_to_client(client, product)
+        self._add_to_product_list(product)
+
+    def _add_to_client(self, client, product):
         for client_product in client.products:
             if client_product == product:
                 client_product.count += product.count
                 return
         client.products.append(product)
+
+    def _add_to_product_list(self, new_product):
+        for product in self.product_list:
+            if new_product == product:
+                product.count += new_product.count
+                return
+        self.product_list.append(new_product)
 
     def remove_client(self, reason, client):
         print("DISCONNECTING:Client = %s (%s)" % (client.name, reason))
@@ -74,3 +85,16 @@ class DataContainer():
         print("CLIENTS DELETING")
         for client in self.client_list:
             self.remove_client(reason="server closed", client=client)
+
+    def buy_product(self, client, pr_id, count):
+        if self.product_list[pr_id].count < count:
+            return "Asking for %d %s, but have %d" % (
+            count, self.product_list[pr_id].name, self.product_list[pr_id].count)
+        client.bank_account -= self.product_list[pr_id].price * count
+        if self.product_list[pr_id].count == count:
+            ans = "Oh yeah, You bought all %s" % self.product_list[pr_id].name
+            del self.product_list[pr_id]
+            return ans
+        else:
+            self.product_list[pr_id].count -= count
+            return "You bought %d %s" % (count, self.product_list[pr_id].name)
