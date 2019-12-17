@@ -25,7 +25,7 @@ COLOR_INDEX = colorama.Fore.WHITE
 HELP_CLIENT = "%s------- AVAILABLE CLIENT COMMANDS --------------\n" \
               "%s/add name:str price:str count:int\n" \
               "/buy id:int count:int\n" \
-              "/req_products\n" \
+              "/get_products\n" \
               "/fill_up num:int\n" \
               "/help\n" \
               "/exit\n" \
@@ -57,13 +57,13 @@ def write_loop(s, connected, name):
         command = input()
         splited_text = re.sub(" +", " ", command).split(" ")
 
-        send_packet = PacketProcessor.get_disc_packet("undefined case command on client")
         if splited_text[0].lower() == "/add" and len(splited_text) == 4:
             try:
                 name = splited_text[1]
                 price = int(splited_text[2])
                 count = int(splited_text[3])
                 send_packet = PacketProcessor.get_add_product_packet(name=name, price=price, count=count)
+                s.send(send_packet)
                 debug_print("ADD PACKET SENDING (OP = %d)" %
                             PacketProcessor.parse_packet(send_packet)[0])
 
@@ -75,13 +75,15 @@ def write_loop(s, connected, name):
                 id = int(splited_text[1])
                 count = int(splited_text[2])
                 send_packet = PacketProcessor.get_buy_product_packet(id=id, count=count)
+                s.send(send_packet)
                 debug_print("BUY PACKET SENDING (OP = %d)" %
                             PacketProcessor.parse_packet(send_packet)[0])
             except:
                 debug_print("bad data in /buy command")
 
-        elif splited_text[0].lower() == 'req_products':
+        elif splited_text[0].lower() == '/get_products':
             send_packet = PacketProcessor.get_req_prodcuts_packet()
+            s.send(send_packet)
             debug_print("REQ_PRODUCTS PACKET SENDING (OP = %d)" %
                         PacketProcessor.parse_packet(send_packet)[0])
 
@@ -89,6 +91,7 @@ def write_loop(s, connected, name):
             try:
                 num = int(splited_text[1])
                 send_packet = PacketProcessor.get_fill_up_ba_packet(num)
+                s.send(send_packet)
                 debug_print("BUY PACKET SENDING (OP = %d)" %
                             PacketProcessor.parse_packet(send_packet)[0])
             except:
@@ -96,11 +99,12 @@ def write_loop(s, connected, name):
 
         elif splited_text[0].lower() == '/exit':
             send_packet = PacketProcessor.get_disc_packet("exit command on client")
+            s.send(send_packet)
             connected = False
             debug_print("EXIT PACKET SENDING (OP = %d)" %
                         PacketProcessor.parse_packet(send_packet)[0])
-
-        s.send(send_packet)
+        else:
+            debug_print("Undefined command")
 
     debug_print("\rDISCONNECTION IN WRITE LOOP")
     os._exit(0)
@@ -140,7 +144,7 @@ def registration(s):
         opcode, data = PacketProcessor.parse_packet(s.recv(BUFFER_SIZE))
 
         if opcode == PacketProcessor.OP_REGISTRATION:
-            pass
+            return name
         elif opcode == PacketProcessor.OP_SERVER_MSG:
             server_msg_print(date=data["data"]["date"], text=data["data"]["text"])
 
@@ -170,7 +174,7 @@ def main():
     s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     s.connect((TCP_IP, TCP_PORT))
 
-    registration(s)
+    name = registration(s)
 
     help_print()
 
