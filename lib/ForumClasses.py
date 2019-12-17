@@ -29,6 +29,9 @@ class Client():
         self.bank_account = bank_account
         self.products = []
 
+    def __eq__(self, other):
+        return self.name == other.name
+
     def __str__(self):
         return "%s" % self.name
 
@@ -43,6 +46,20 @@ class DataContainer():
     def mock_data(self):
         # TODO
         pass
+
+    def add_client(self, client):
+        if client not in self.client_list:
+            self.client_list.append(client)
+        else:
+            return False
+        return True
+
+    def add_product(self, client, product):
+        for client_product in client.products:
+            if client_product == product:
+                client_product.count += product.count
+                return
+        client.products.append(product)
 
     def remove_client(self, reason, client):
         print("DISCONNECTING:Client = %s (%s)" % (client.name, reason))

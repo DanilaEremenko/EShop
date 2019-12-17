@@ -9,7 +9,7 @@ from threading import Thread
 
 from lib.CommonConstants import BUFFER_SIZE
 from lib import PacketProcessor
-from lib.ForumClasses import DataContainer, Client
+from lib.ForumClasses import DataContainer, Client, Product
 from pandas import DataFrame
 
 # ------------------------------ COLORS -----------------------------------
@@ -35,14 +35,17 @@ HELP_SERVER = "%s------------ AVAILABLE SERVER COMMANDS ----------\n" \
 
 
 def debug_print(text):
-    print("%sDEBUG:%s" % (colorama.Fore.RED, text))
+    print("%sDEBUG:%s%s" % (colorama.Fore.RED, text, colorama.Fore.RESET))
+
+def verbose_print(text):
+    print("%sVERBOSE:%s%s" % (colorama.Fore.GREEN, text, colorama.Fore.RESET))
+
 
 
 # ---------------------------------- CMD INPUT  ----------------------------------------------
 def cmd_processing(dc: DataContainer):
     while True:
         command = re.sub(" +", " ", input())
-        command_splited = command.split()
         if command.lower() == "exit":
             exit_server(dc)
         elif command.lower() == "get_products":
@@ -69,7 +72,7 @@ def get_products(dc: DataContainer):
         counts.append(product.count)
         owner_names.append(product.owner.name)
 
-    return {"ids": ids, "names": names, "prices": prices, "counts": counts, "owner_names": owner_names}
+    return {"id": ids, "name": names, "price": prices, "count": counts, "owner_name": owner_names}
 
 
 def get_clients(dc: DataContainer):
@@ -82,22 +85,37 @@ def get_clients(dc: DataContainer):
         names.append(client.name)
         accounts.append(client.bank_account)
 
-    return {"ids": ids, "names": names, "bank_account": accounts}
+    return {"id": ids, "name": names, "bank_account": accounts}
 
 
 def client_registration(dc, client):
-    opcode, data = PacketProcessor.parse_packet(client.conn.recv(BUFFER_SIZE))
-    if opcode == PacketProcessor.OP_REGISTRATION:
-        client.name = data["data"]["name"]
-        client.is_connected = True
-        print("New client = %s(%d) accepted" % (client.name, client.conn.fileno()))
+    while True:
+        opcode, data = PacketProcessor.parse_packet(client.conn.recv(BUFFER_SIZE))
 
-    else:
-        print("opcode = %d (%d awaiting)" % (opcode, PacketProcessor.OP_REGISTRATION))
-        send_packet = PacketProcessor.get_disc_packet("NO NAME MESSAGE SENDED")
-        client.conn.send(send_packet)
-        dc.remove_client(reason="BAD OPCODE OF INIT MESSAGE", client=client)
-        client.is_connected = False
+        if opcode == PacketProcessor.OP_REGISTRATION:
+            client.name = data["data"]["name"]
+            if dc.add_client(client):
+                client.is_connected = True
+                verbose_print("New client = %s(%d) accepted" % (client.name, client.conn.fileno()))
+                send_packet = PacketProcessor.get_registration_packet(client.name)
+                client.conn.send(send_packet)
+                break
+            else:
+                send_packet = PacketProcessor.get_server_msg_packet(
+                    text="client with name %s alreadry exist" % client.name, date="now")
+                client.conn.send(send_packet)
+
+        elif opcode == PacketProcessor.OP_DISC:
+            client.is_connected = False
+            break
+
+        else:
+            print("opcode = %d (%d awaiting)" % (opcode, PacketProcessor.OP_REGISTRATION))
+            send_packet = PacketProcessor.get_disc_packet("NO NAME MESSAGE SENDED")
+            client.conn.send(send_packet)
+            dc.remove_client(reason="BAD OPCODE OF INIT MESSAGE", client=client)
+            client.is_connected = False
+            break
 
 
 # ---------------------------- client_processing -----------------------------------
@@ -109,10 +127,16 @@ def client_processing(client: Client, dc: DataContainer):
         opcode, data = PacketProcessor.parse_packet(client.conn.recv(BUFFER_SIZE))
         send_packet = PacketProcessor.get_disc_packet("BAD OPCODE")
         if opcode == PacketProcessor.OP_ADD_PRODUCT:
-            # TODO
-            debug_print("OP_ADD_PRODUCT isn't processed")
+            dc.mutex.acquire()
+            count = data["data"]["count"]
+            new_product = Product(name=data["data"]["name"], price=data["data"]["price"], count=count,
+                                  owner=client.name)
+            dc.add_product(client, new_product)
+            dc.mutex.release()
+            verbose_print("Product %s added" % data["data"]["name"])
+            send_packet = PacketProcessor.get_server_msg_packet("Your product added", "now")
         elif opcode == PacketProcessor.OP_BUY_PRODUCT:
-            # TODO
+            client.bank_account -= dc.product_list[data["data"]["id"]].price * data["data"]["count"]
             debug_print("OP_BUY_PRODUCT isn't processed")
         elif opcode == PacketProcessor.OP_REQ_PRODUCTS:
             # TODO
@@ -121,8 +145,9 @@ def client_processing(client: Client, dc: DataContainer):
             # TODO
             debug_print("OP_FILL_UP_BA isn't processed")
         elif opcode == PacketProcessor.OP_DISC:
-            # TODO
+            dc.remove_client(reason="DISCONNECTION OPCODE == %d" % opcode, client=client)
             debug_print("OP_DISC isn't processed")
+            break
         else:
             raise Exception("Undefined opcode = %d" % opcode)
 
@@ -178,9 +203,6 @@ def main():
         new_client.thread = Thread(target=client_processing,
                                    args=(new_client, dc),
                                    daemon=True)
-        dc.mutex.acquire()
-        dc.client_list.append(new_client)
-        dc.mutex.release()
         new_client.thread.start()
 
 
