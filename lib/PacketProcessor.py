@@ -3,7 +3,7 @@ import struct
 import json
 
 from lib import CommonConstants
-from lib.ForumClasses import DataContainer
+from lib.EShopClasses import DataContainer
 
 
 # ----------------------------------------------------------------

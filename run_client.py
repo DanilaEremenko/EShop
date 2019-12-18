@@ -150,7 +150,7 @@ def registration(s):
 # ----------------------------------------------------------------
 def main():
     # ---------------- parsing arguments --------------------------
-    parser = argparse.ArgumentParser(description="Client for SimpleForum")
+    parser = argparse.ArgumentParser(description="Client for EShop")
 
     parser.add_argument("-i", "--ip", type=str, action='store',
                         help="direcotry with data")

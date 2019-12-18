@@ -9,7 +9,7 @@ from threading import Thread
 
 from lib.CommonConstants import BUFFER_SIZE
 from lib import PacketProcessor
-from lib.ForumClasses import DataContainer, Client, Product
+from lib.EShopClasses import DataContainer, Client, Product
 from pandas import DataFrame
 
 # ------------------------------ COLORS -----------------------------------
@@ -190,7 +190,7 @@ def main():
     dc = DataContainer()
     dc.mock_data()
     # ---------------- parsing arguments --------------------------
-    parser = argparse.ArgumentParser(description="Client for EShop")
+    parser = argparse.ArgumentParser(description="Server for EShop")
 
     parser.add_argument("-i", "--ip", type=str, action='store',
                         help="direcotry with data")
