@@ -1,10 +1,11 @@
 import argparse
 import colorama
+import re
 from datetime import datetime
 import os
-import re
 import socket
 from threading import Thread
+from pandas import DataFrame
 
 from lib.CommonConstants import BUFFER_SIZE
 from lib import PacketProcessor
@@ -14,7 +15,7 @@ COLOR_DATE = colorama.Fore.YELLOW
 COLOR_NAME = colorama.Fore.BLUE
 COLOR_TEXT = colorama.Fore.WHITE
 COLOR_DEBUG = colorama.Fore.RED
-COLOR_SERVER_NAME = colorama.Fore.RED
+COLOR_SERVER_NAME = colorama.Fore.GREEN
 COLOR_TOPIC_NAME = colorama.Fore.CYAN
 COLOR_DIV_LINES = colorama.Fore.MAGENTA
 COLOR_COMMAND = colorama.Fore.GREEN
@@ -22,9 +23,10 @@ COLOR_INDEX = colorama.Fore.WHITE
 
 # ---------------------------- HELP -----------------------------------
 HELP_CLIENT = "%s------- AVAILABLE CLIENT COMMANDS --------------\n" \
-              "%s/put_topic name\n" \
-              "/get_topic_list\n" \
-              "/switch_topic num\n" \
+              "%s/add name:str price:str count:int\n" \
+              "/buy id:int count:int\n" \
+              "/get_products\n" \
+              "/fill_up num:int\n" \
               "/help\n" \
               "/exit\n" \
               "%s------------------------------------------------\n%s" % \
@@ -44,11 +46,65 @@ def help_print():
     print(HELP_CLIENT)
 
 
+def print_products(data_dict: dict):
+    print("%s------------------ PRODUCTS FROM SERVER --------------- %s" % (COLOR_DIV_LINES, colorama.Fore.RESET))
+    print(DataFrame(data_dict))
+
+
 # ------------------------ WRITE --------------------------------
 def write_loop(s, connected, name):
     while connected:
-        # TODO
-        break
+        command = input()
+        splited_text = re.sub(" +", " ", command).split(" ")
+
+        if splited_text[0].lower() == "/add" and len(splited_text) == 4:
+            try:
+                name = splited_text[1]
+                price = int(splited_text[2])
+                count = int(splited_text[3])
+                send_packet = PacketProcessor.get_add_product_packet(name=name, price=price, count=count)
+                s.send(send_packet)
+                debug_print("ADD PACKET SENDING (OP = %d)" %
+                            PacketProcessor.parse_packet(send_packet)[0])
+
+            except:
+                debug_print("bad data in /add command")
+
+        elif splited_text[0].lower() == "/buy" and len(splited_text) == 3:
+            try:
+                id = int(splited_text[1])
+                count = int(splited_text[2])
+                send_packet = PacketProcessor.get_buy_product_packet(id=id, count=count)
+                s.send(send_packet)
+                debug_print("BUY PACKET SENDING (OP = %d)" %
+                            PacketProcessor.parse_packet(send_packet)[0])
+            except:
+                debug_print("bad data in /buy command")
+
+        elif splited_text[0].lower() == '/get_products':
+            send_packet = PacketProcessor.get_req_prodcuts_packet()
+            s.send(send_packet)
+            debug_print("REQ_PRODUCTS PACKET SENDING (OP = %d)" %
+                        PacketProcessor.parse_packet(send_packet)[0])
+
+        elif splited_text[0].lower() == "/fill_up" and len(splited_text) == 2:
+            try:
+                num = int(splited_text[1])
+                send_packet = PacketProcessor.get_fill_up_ba_packet(num)
+                s.send(send_packet)
+                debug_print("BUY PACKET SENDING (OP = %d)" %
+                            PacketProcessor.parse_packet(send_packet)[0])
+            except:
+                debug_print("bad data in /fill_up command")
+
+        elif splited_text[0].lower() == '/exit':
+            send_packet = PacketProcessor.get_disc_packet("exit command on client")
+            s.send(send_packet)
+            connected = False
+            debug_print("EXIT PACKET SENDING (OP = %d)" %
+                        PacketProcessor.parse_packet(send_packet)[0])
+        else:
+            debug_print("Undefined command")
 
     debug_print("\rDISCONNECTION IN WRITE LOOP")
     os._exit(0)
@@ -60,12 +116,10 @@ def read_loop(s, connected):
         opcode, data = PacketProcessor.parse_packet(s.recv(BUFFER_SIZE))
 
         if opcode == PacketProcessor.OP_SERVER_MSG:
-            # TODO
-            debug_print("OP_SERVER_MSG isn't processed")
+            server_msg_print(text=data["data"]["text"], date=data["data"]["date"])
 
         elif opcode == PacketProcessor.OP_ANSW_PRODCUTS:
-            # TODO
-            debug_print("OP_ANSW_PRODCUTS isn't processed")
+            print_products(data_dict=data["data"])
 
         elif opcode == PacketProcessor.OP_DISC:
             debug_print("RECEIVED OP_DISC FROM SERVER(%s)" % data["data"]["reason"])
@@ -77,6 +131,20 @@ def read_loop(s, connected):
 
     debug_print("\rDISCONNECTION IN READ LOOP")
     os._exit(0)
+
+
+def registration(s):
+    while True:
+        name = input("Print your name: ")
+        send_packet = PacketProcessor.get_registration_packet(name=name)
+        s.send(send_packet)
+
+        opcode, data = PacketProcessor.parse_packet(s.recv(BUFFER_SIZE))
+
+        if opcode == PacketProcessor.OP_REGISTRATION:
+            return name
+        elif opcode == PacketProcessor.OP_SERVER_MSG:
+            server_msg_print(date=data["data"]["date"], text=data["data"]["text"])
 
 
 # ----------------------------------------------------------------
@@ -104,10 +172,7 @@ def main():
     s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     s.connect((TCP_IP, TCP_PORT))
 
-    # Authorization
-    name = input("Print your name: ")
-    send_packet = PacketProcessor.get_registration_packet(name=name)
-    s.send(send_packet)
+    name = registration(s)
 
     help_print()
 
