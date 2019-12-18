@@ -15,7 +15,7 @@ COLOR_DATE = colorama.Fore.YELLOW
 COLOR_NAME = colorama.Fore.BLUE
 COLOR_TEXT = colorama.Fore.WHITE
 COLOR_DEBUG = colorama.Fore.RED
-COLOR_SERVER_NAME = colorama.Fore.RED
+COLOR_SERVER_NAME = colorama.Fore.GREEN
 COLOR_TOPIC_NAME = colorama.Fore.CYAN
 COLOR_DIV_LINES = colorama.Fore.MAGENTA
 COLOR_COMMAND = colorama.Fore.GREEN
@@ -117,11 +117,9 @@ def read_loop(s, connected):
 
         if opcode == PacketProcessor.OP_SERVER_MSG:
             server_msg_print(text=data["data"]["text"], date=data["data"]["date"])
-            debug_print("OP_SERVER_MSG isn't processed")
 
         elif opcode == PacketProcessor.OP_ANSW_PRODCUTS:
             print_products(data_dict=data["data"])
-            debug_print("OP_ANSW_PRODCUTS isn't processed")
 
         elif opcode == PacketProcessor.OP_DISC:
             debug_print("RECEIVED OP_DISC FROM SERVER(%s)" % data["data"]["reason"])
