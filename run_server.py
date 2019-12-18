@@ -79,48 +79,64 @@ def get_clients(dc: DataContainer):
     ids = []
     names = []
     accounts = []
+    ips = []
+    is_connected = []
 
     for id, client in enumerate(dc.client_list):
         ids.append(id)
         names.append(client.name)
         accounts.append(client.bank_account)
+        ips.append(client.addr[0])
+        is_connected.append(client.is_connected)
 
-    return {"id": ids, "name": names, "bank_account": accounts}
+    return {"id": ids, "name": names, "bank_account": accounts, "ips": ips,
+            "is_connected": is_connected}
 
 
-def client_registration(dc, client):
+def client_registration(dc, new_client):
     while True:
-        opcode, data = PacketProcessor.parse_packet(client.conn.recv(BUFFER_SIZE))
+        opcode, data = PacketProcessor.parse_packet(new_client.conn.recv(BUFFER_SIZE))
 
         if opcode == PacketProcessor.OP_REGISTRATION:
-            client.name = data["data"]["name"]
-            if dc.add_client(client):
-                client.is_connected = True
-                verbose_print("New client = %s(%d) accepted" % (client.name, client.conn.fileno()))
-                send_packet = PacketProcessor.get_registration_packet(client.name)
-                client.conn.send(send_packet)
-                break
-            else:
+            new_client.name = data["data"]["name"]
+            if dc.add_client(new_client):  # registration
+                new_client.is_connected = True
+                verbose_print("New client = %s(%d) accepted" % (new_client.name, new_client.conn.fileno()))
+                send_packet = PacketProcessor.get_registration_packet(new_client.name)
+                new_client.conn.send(send_packet)
+                return new_client
+            else:  # authorization
+                for client in dc.client_list:
+                    if client == new_client:
+                        client.addr = new_client.addr
+                        client.conn = new_client.conn
+                        new_client = client
+                        break
+                send_packet = PacketProcessor.get_registration_packet(new_client.name)
+                new_client.conn.send(send_packet)
                 send_packet = PacketProcessor.get_server_msg_packet(
-                    text="client with name %s alreadry exist" % client.name, date="now")
-                client.conn.send(send_packet)
+                    text="You already have account %s. Your bank account = %d" % (
+                        new_client.name, new_client.bank_account), date="now")
+                new_client.conn.send(send_packet)
+                new_client.is_connected = True
+                return new_client
 
         elif opcode == PacketProcessor.OP_DISC:
-            client.is_connected = False
-            break
+            new_client.is_connected = False
+            return new_client
 
         else:
             print("opcode = %d (%d awaiting)" % (opcode, PacketProcessor.OP_REGISTRATION))
             send_packet = PacketProcessor.get_disc_packet("NO NAME MESSAGE SENDED")
-            client.conn.send(send_packet)
-            dc.remove_client(reason="BAD OPCODE OF INIT MESSAGE", client=client)
-            client.is_connected = False
-            break
+            new_client.conn.send(send_packet)
+            dc.disconnect_client(reason="BAD OPCODE OF INIT MESSAGE", client=new_client)
+            new_client.is_connected = False
+            return new_client
 
 
 # ---------------------------- client_processing -----------------------------------
 def client_processing(client: Client, dc: DataContainer):
-    client_registration(dc, client)
+    client = client_registration(dc, client)
 
     # -------------------- process client loop -----------------------------------
     while client.is_connected:
@@ -135,22 +151,25 @@ def client_processing(client: Client, dc: DataContainer):
             dc.mutex.release()
             verbose_print("Product %s added" % data["data"]["name"])
             send_packet = PacketProcessor.get_server_msg_packet("Your product added", "now")
+
         elif opcode == PacketProcessor.OP_BUY_PRODUCT:
             ans = dc.buy_product(client, data["data"]["id"], data["data"]["count"])
-            verbose_print(ans)
+            verbose_print("Client %s: %s" % (client.name, ans))
             send_packet = PacketProcessor.get_server_msg_packet(
                 "%s.Your bank account = %d" % (ans, client.bank_account), "now")
+
         elif opcode == PacketProcessor.OP_REQ_PRODUCTS:
             send_packet = PacketProcessor.get_answ_prodcuts_packet(dc)
-            debug_print("OP_REQ_PRODUCTS isn't processed")
+
         elif opcode == PacketProcessor.OP_FILL_UP_BA:
             verbose_print("%s bank account = %d + %d" % (client.name, client.bank_account, data["data"]["money"]))
             client.bank_account += data["data"]["money"]
             send_packet = PacketProcessor.get_server_msg_packet("Your bank account = %d" % client.bank_account, "now")
+
         elif opcode == PacketProcessor.OP_DISC:
-            dc.remove_client(reason="DISCONNECTION OPCODE == %d" % opcode, client=client)
-            debug_print("OP_DISC isn't processed")
+            dc.disconnect_client(reason="DISCONNECTION OPCODE == %d" % opcode, client=client)
             break
+
         else:
             raise Exception("Undefined opcode = %d" % opcode)
 
@@ -161,7 +180,7 @@ def client_processing(client: Client, dc: DataContainer):
 
 # ---------------------------------- EXIT----------------------------------
 def exit_server(dc: DataContainer):
-    dc.remove_all_clients()
+    dc.disconnect_all_clients()
     print("SERVER EXITING")
     os._exit(0)
 

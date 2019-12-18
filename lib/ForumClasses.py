@@ -25,7 +25,6 @@ class Client():
         self.name = name
         self.is_connected = False
         self.thread = thread
-        self.current_topic = None
         self.bank_account = bank_account
         # self.products = []
 
@@ -72,25 +71,32 @@ class DataContainer():
                 return
         self.product_list.append(new_product)
 
-    def remove_client(self, reason, client):
+    def disconnect_client(self, reason, client):
         print("DISCONNECTING:Client = %s (%s)" % (client.name, reason))
         send_packet = PacketProcessor.get_disc_packet(reason)
         client.conn.send(send_packet)
         client.is_connected = False
-        self.client_list.remove(client)
+        # self.client_list.remove(client)
 
         client.conn.close()
 
-    def remove_all_clients(self):
-        print("CLIENTS DELETING")
+    def disconnect_all_clients(self):
+        print("CLIENTS DISCONNECTING")
         for client in self.client_list:
-            self.remove_client(reason="server closed", client=client)
+            self.disconnect_client(reason="server closed", client=client)
 
     def buy_product(self, client, pr_id, count):
         if self.product_list[pr_id].count < count:
             return "Asking for %d %s, but have %d" % (
-            count, self.product_list[pr_id].name, self.product_list[pr_id].count)
-        client.bank_account -= self.product_list[pr_id].price * count
+                count, self.product_list[pr_id].name, self.product_list[pr_id].count)
+
+        if client != self.product_list[pr_id].owner:
+            if client.bank_account < self.product_list[pr_id].price * count:
+                return "Ops, seems you don't have enough money"
+
+            client.bank_account -= self.product_list[pr_id].price * count
+            self.product_list[pr_id].owner.bank_account += self.product_list[pr_id].price * count
+
         if self.product_list[pr_id].count == count:
             ans = "Oh yeah, You bought all %s" % self.product_list[pr_id].name
             del self.product_list[pr_id]
