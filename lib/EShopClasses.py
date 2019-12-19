@@ -19,17 +19,18 @@ class Product:
 
 # ---------------------------- CLIENT CLASS -----------------------------------
 class Client():
-    def __init__(self, conn, addr, name, thread, bank_account):
+    def __init__(self, conn, addr, name, key_hash, thread, bank_account):
         self.conn = conn
         self.addr = addr
         self.name = name
+        self.key_hash = key_hash
         self.is_connected = False
         self.thread = thread
         self.bank_account = bank_account
         # self.products = []
 
     def __eq__(self, other):
-        return self.name == other.name
+        return self.name == other.name and self.key_hash == other.key_hash
 
     def __str__(self):
         return "%s" % self.name
@@ -72,10 +73,11 @@ class DataContainer():
         self.product_list.append(new_product)
 
     def disconnect_client(self, reason, client):
-        print("DISCONNECTING:Client = %s (%s)" % (client.name, reason))
-        send_packet = PacketProcessor.get_disc_packet(reason)
-        client.conn.send(send_packet)
-        client.is_connected = False
+        if client.is_connected:
+            print("DISCONNECTING:Client = %s (%s)" % (client.name, reason))
+            send_packet = PacketProcessor.get_disc_packet(reason)
+            client.conn.send(send_packet)   
+            client.is_connected = False
         # self.client_list.remove(client)
 
         client.conn.close()

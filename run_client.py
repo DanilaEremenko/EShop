@@ -2,6 +2,7 @@ import argparse
 import colorama
 import re
 from datetime import datetime
+import hashlib
 import os
 import socket
 from threading import Thread
@@ -35,7 +36,7 @@ HELP_CLIENT = "%s------- AVAILABLE CLIENT COMMANDS --------------\n" \
 
 # ------------------------ PRINTS --------------------------
 def debug_print(text):
-    print("%sDEBUG:%s" % (COLOR_DEBUG, text))
+    print("%sDEBUG:%s%s" % (COLOR_DEBUG, text, colorama.Fore.RESET))
 
 
 def server_msg_print(date, text, end="\n"):
@@ -97,6 +98,9 @@ def write_loop(s, connected, name):
             except:
                 debug_print("bad data in /fill_up command")
 
+        elif splited_text[0].lower() == '/help':
+            help_print()
+
         elif splited_text[0].lower() == '/exit':
             send_packet = PacketProcessor.get_disc_packet("exit command on client")
             s.send(send_packet)
@@ -136,7 +140,13 @@ def read_loop(s, connected):
 def registration(s):
     while True:
         name = input("Print your name: ")
-        send_packet = PacketProcessor.get_registration_packet(name=name)
+        password = input("Print your password: ")
+        m = hashlib.md5()
+        m.update(name.encode())
+        m.update(password.encode())
+        client_hash = m.hexdigest()
+
+        send_packet = PacketProcessor.get_registration_packet(name=name, client_hash=client_hash)
         s.send(send_packet)
 
         opcode, data = PacketProcessor.parse_packet(s.recv(BUFFER_SIZE))

@@ -78,6 +78,7 @@ def get_products(dc: DataContainer):
 def get_clients(dc: DataContainer):
     ids = []
     names = []
+    key_hashes = []
     accounts = []
     ips = []
     is_connected = []
@@ -85,11 +86,12 @@ def get_clients(dc: DataContainer):
     for id, client in enumerate(dc.client_list):
         ids.append(id)
         names.append(client.name)
+        key_hashes.append(client.key_hash)
         accounts.append(client.bank_account)
         ips.append(client.addr[0])
         is_connected.append(client.is_connected)
 
-    return {"id": ids, "name": names, "bank_account": accounts, "ips": ips,
+    return {"id": ids, "name": names, "key_hashes": key_hashes, "bank_account": accounts, "ips": ips,
             "is_connected": is_connected}
 
 
@@ -99,11 +101,16 @@ def client_registration(dc, new_client):
 
         if opcode == PacketProcessor.OP_REGISTRATION:
             new_client.name = data["data"]["name"]
+            new_client.key_hash = data["data"]["client_hash"]
             if dc.add_client(new_client):  # registration
-                new_client.is_connected = True
                 verbose_print("New client = %s(%d) accepted" % (new_client.name, new_client.conn.fileno()))
-                send_packet = PacketProcessor.get_registration_packet(new_client.name)
+                send_packet = PacketProcessor.get_registration_packet(name=new_client.name, client_hash="saved")
                 new_client.conn.send(send_packet)
+                send_packet = PacketProcessor.get_server_msg_packet(
+                    text="New account %s created. Your bank account = %d" % (
+                        new_client.name, new_client.bank_account), date="now")
+                new_client.conn.send(send_packet)
+                new_client.is_connected = True
                 return new_client
             else:  # authorization
                 for client in dc.client_list:
@@ -112,7 +119,7 @@ def client_registration(dc, new_client):
                         client.conn = new_client.conn
                         new_client = client
                         break
-                send_packet = PacketProcessor.get_registration_packet(new_client.name)
+                send_packet = PacketProcessor.get_registration_packet(new_client.name, client_hash="authorization")
                 new_client.conn.send(send_packet)
                 send_packet = PacketProcessor.get_server_msg_packet(
                     text="You already have account %s. Your bank account = %d" % (
@@ -221,7 +228,7 @@ def main():
     while True:
         # new clients accepting
         conn, addr = s.accept()
-        new_client = Client(conn=conn, addr=addr, name="not initialized", thread=None, bank_account=0)
+        new_client = Client(conn=conn, addr=addr, name="not initialized", thread=None, bank_account=0, key_hash="empty")
         new_client.thread = Thread(target=client_processing,
                                    args=(new_client, dc),
                                    daemon=True)

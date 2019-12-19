@@ -130,8 +130,8 @@ def get_disc_packet(reason):
 OP_REGISTRATION = 7
 
 
-def get_registration_packet(name):
-    json_text = json.dumps({"data": {"name": name}})
+def get_registration_packet(name, client_hash):
+    json_text = json.dumps({"data": {"name": name, "client_hash": client_hash}})
     send_format = "!2H%ds" % len(json_text)
     return struct.pack(send_format.encode(),
                        OP_REGISTRATION,
