@@ -1,0 +1,63 @@
+//OP_SERVER_MSG
+{
+  "data": {
+    "text": str,
+    "date": str
+  }
+}
+
+//OP_ADD_PRODUCT
+{
+  "data": {
+    "name": str,
+    "price": int,
+    "count": int
+  }
+}
+
+//OP_BUY_PRODUCT
+{
+  "data": {
+    "id": str,
+    "count": int
+  }
+}
+
+//OP_REQ_PRODUCTS
+{
+  "data": {
+    "empty": "empty"
+    }
+}
+
+//OP_ANSW_PRODCUTS
+{
+  "data": {
+    "ids": [],
+    "prices": [],
+    "counts": [],
+    "owner_names": []
+  }
+}
+
+//OP_FILL_UP_BA
+{
+  "data": {
+    "money": int
+  }
+}
+
+//OP_DISC
+{
+  "data": {
+    "reason": str
+  }
+}
+
+//OP_REGISTRATION
+{
+  "data": {
+    "name": str,
+    "client_hash": str
+  }
+}
